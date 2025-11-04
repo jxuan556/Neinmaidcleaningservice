@@ -1,0 +1,143 @@
+:root{
+  --brand:#ff7aa2;
+  --brand-600:#ff5c8e;
+  --ink:#243046;
+  --muted:#6b7280;
+  --line:#ffd3e3;
+  --bg:#fffafb;
+  --paper:#ffffff;
+  --radius:18px;
+  --green:#16a34a;
+  --shadow:0 12px 28px rgba(255,122,162,.16);
+}
+
+/* Base */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(900px 480px at -5% -10%, #fff1f6 0%, transparent 60%),
+    radial-gradient(900px 480px at 110% 10%, #f0fffa 0%, transparent 60%),
+    var(--bg);
+}
+a{color:inherit;text-decoration:none}
+
+/* Navbar */
+.navbar{
+  position:sticky;top:0;z-index:40;
+  background:rgba(255,255,255,.85);
+  backdrop-filter:saturate(180%) blur(8px);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:12px 22px;
+}
+.brand{
+  display:flex;align-items:center;gap:10px;
+  font-weight:900;color:var(--brand);letter-spacing:.3px;
+}
+.brand img{width:34px;height:34px;object-fit:cover;border-radius:10px;}
+.back-btn{
+  background:#fff;border:1px solid var(--line);color:#a31e54;
+  border-radius:999px;height:40px;padding:0 14px;font-weight:900;cursor:pointer;
+  box-shadow:0 8px 18px rgba(255,122,162,.08);
+}
+.back-btn:hover{background:#fff8fb}
+
+/* Container & Card */
+.container{max-width:1000px;margin:28px auto;padding:0 16px;}
+.card{
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:20px;box-shadow:var(--shadow);padding:22px;
+}
+
+/* Headings */
+.section-title{text-align:center;color:#a31e54;margin:4px 0 14px;font-weight:900;letter-spacing:.2px;}
+
+/* Services */
+.services{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
+.service{
+  min-width:220px;text-align:center;padding:14px 16px;
+  border-radius:16px;border:1px solid var(--line);background:#fff;cursor:pointer;transition:.2s;
+  box-shadow:0 6px 16px rgba(255,122,162,.08);
+  font-weight:800;color:#a31e54;
+}
+.service:hover{transform:translateY(-2px);background:#fff8fb;}
+.service.active{border-color:#ffbed5;background:#ffe6f0;}
+
+/* Inputs */
+.row{display:grid;grid-template-columns:1fr;gap:10px;margin:16px 0}
+label{font-weight:800;color:#3a3a4a}
+select,input[type="text"],textarea{
+  width:100%;padding:12px;border-radius:12px;border:1px solid #f2e9f3;font-size:16px;background:#fff;outline:none;
+}
+select:focus,input[type="text"]:focus,textarea:focus{
+  border-color:#ffa7c3;box-shadow:0 0 0 4px rgba(255,167,195,.18);
+}
+.flex{display:flex;gap:12px;flex-wrap:wrap}
+.hidden{display:none}
+
+/* Calendar */
+.calendar{margin-top:6px;}
+.cal-meta{display:flex;gap:12px;flex-wrap:wrap}
+.calendar table{width:100%;border-collapse:separate;border-spacing:6px;margin-top:10px}
+.calendar th{padding:8px;color:#a31e54;font-weight:900;font-size:13px}
+.calendar td{
+  padding:12px;text-align:center;background:#fff;border:1px solid #f2e9f3;border-radius:12px;
+  cursor:pointer;transition:.15s;color:#3a3a4a;
+}
+.calendar td:hover{background:#fff8fb}
+.calendar .selected{background:var(--brand);color:#fff;font-weight:900;border-color:transparent}
+.calendar .disabled{color:#b9bdc7;cursor:not-allowed;background:#f7f7f9;border-style:dashed;}
+
+/* Summary */
+.note{font-size:13px;color:#555}
+.summary{
+  margin-top:16px;padding:14px;border:1px solid #ffd3e3;border-radius:16px;background:#fff;
+  box-shadow:0 6px 16px rgba(255,122,162,.06);
+}
+.summary div{margin:6px 0}
+.summary strong{color:#a31e54}
+
+/* Buttons */
+.btn{
+  display:inline-block;margin:16px 0 0 auto;padding:12px 18px;
+  background:var(--brand);color:#fff;border:none;border-radius:999px;cursor:pointer;font-weight:900;
+  box-shadow:0 10px 24px rgba(255,122,162,.20);
+}
+.btn:hover{background:var(--brand-600)}
+
+/* Footer */
+.footer{text-align:center;padding:16px;color:#9aa1ad;}
+.footer a{color:#a31e54;font-weight:800}
+
+@media (max-width:640px){
+  .service{min-width:48%;}
+}
+/* Cute back button */
+.nav-btn {
+  background: linear-gradient(135deg, #ffb6c9 0%, #ff7aa2 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 900;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 122, 162, .25);
+  transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+  background: linear-gradient(135deg, #ff94b5 0%, #ff5c8e 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(255, 122, 162, .35);
+}
+
+.back-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
