@@ -13,9 +13,37 @@ $conn = new mysqli($DB_HOST,$DB_USER,$DB_PASS,$DB_NAME);
 $conn->set_charset('utf8mb4');
 
 /* ===== Helpers ===== */
+date_default_timezone_set('Asia/Kuala_Lumpur');
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 $today  = date('Y-m-d');
-$weekTo = date('Y-m-d', strtotime('+7 days'));
+$weekTo = date('Y-m-d', strtotime('+30 days'));
+
+/* === Time window for actions (minutes) === */
+if (!defined('ACTION_WINDOW_MIN')) define('ACTION_WINDOW_MIN', 120);
+
+function slot_to_datetime(?string $date, ?string $slot): ?DateTime {
+  if (!$date || !$slot) return null;
+  $s = mb_strtolower(trim($slot));
+  if (strpos($s, '-') !== false) $s = trim(explode('-', $s)[0]); // left part if "12:00 PM - 2:00 PM"
+  if (!preg_match('/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i', $s, $m)) return null;
+  $h = (int)$m[1];
+  $min = isset($m[2]) ? (int)$m[2] : 0;
+  $ap = isset($m[3]) ? strtolower($m[3]) : '';
+  if ($ap === 'pm' && $h < 12) $h += 12;
+  if ($ap === 'am' && $h === 12) $h = 0;
+  $tz = new DateTimeZone('Asia/Kuala_Lumpur');
+  $dt = DateTime::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $date, $h, $min), $tz);
+  return $dt ?: null;
+}
+function in_action_window(string $date, string $slot, int $windowMin = ACTION_WINDOW_MIN): bool {
+  $dt = slot_to_datetime($date, $slot);
+  if (!$dt) return false;
+  $tz  = new DateTimeZone('Asia/Kuala_Lumpur');
+  $now = new DateTime('now', $tz);
+  $start = (clone $dt)->modify("-{$windowMin} minutes");
+  $end   = (clone $dt)->modify("+{$windowMin} minutes");
+  return ($now >= $start && $now <= $end);
+}
 
 /* ===== Column exists (MariaDB-safe) ===== */
 function col_exists(mysqli $conn, $table, $col){
@@ -29,18 +57,6 @@ function col_exists(mysqli $conn, $table, $col){
           LIMIT 1";
   $rs = $conn->query($sql);
   return ($rs && $rs->num_rows > 0);
-}
-
-/* Haversine distance (meters) */
-function haversine_m($lat1,$lon1,$lat2,$lon2){
-  if ($lat1===null||$lon1===null||$lat2===null||$lon2===null) return null;
-  $R = 6371000.0;
-  $phi1 = deg2rad((float)$lat1); $phi2 = deg2rad((float)$lat2);
-  $dphi = deg2rad((float)$lat2-(float)$lat1);
-  $dlam = deg2rad((float)$lon2-(float)$lon1);
-  $a = sin($dphi/2)**2 + cos($phi1)*cos($phi2)*sin($dlam/2)**2;
-  $c = 2*atan2(sqrt($a), sqrt(1-$a));
-  return $R*$c;
 }
 
 /* ===== Current user info ===== */
@@ -90,7 +106,7 @@ if (!$profile && $userMail) {
   }
 }
 
-/* ===== AJAX ===== */
+/* ===== AJAX (incl. Start/Finish + availability/link + DECLINE) ===== */
 if (isset($_GET['ajax']) && $_GET['ajax']==='1') {
   header('Content-Type: application/json; charset=utf-8');
   try {
@@ -121,81 +137,11 @@ if (isset($_GET['ajax']) && $_GET['ajax']==='1') {
       echo json_encode(['ok'=>true,'status'=>$status]); exit;
     }
 
-    if ($action === 'ack_job') {
-      $bid = (int)($_POST['booking_id'] ?? 0);
-      if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
-      $st = $conn->prepare("UPDATE bookings SET status='approved' WHERE id=? AND assigned_worker_id=? AND status='assigned' LIMIT 1");
-      $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
-      echo json_encode(['ok'=>true]); exit;
-    }
-
-    if ($action === 'decline_job') {
-      $bid = (int)($_POST['booking_id'] ?? 0);
-      $reason = trim((string)$_POST['reason'] ?? '');
-      if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
-      if ($reason==='') { echo json_encode(['ok'=>false,'msg'=>'Please provide a reason.']); exit; }
-      if (mb_strlen($reason)>500) $reason = mb_substr($reason,0,500);
-
-      $conn->begin_transaction();
-      try{
-        $conn->query("
-          CREATE TABLE IF NOT EXISTS booking_rejections (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            booking_id INT NOT NULL,
-            worker_id INT NOT NULL,
-            reason TEXT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX (booking_id), INDEX (worker_id)
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        ");
-        $st = $conn->prepare("INSERT INTO booking_rejections (booking_id, worker_id, reason) VALUES (?,?,?)");
-        $st->bind_param("iis",$bid,$workerId,$reason); $st->execute(); $st->close();
-
-        $st = $conn->prepare("UPDATE bookings SET assigned_worker_id=NULL, status='pending' WHERE id=? AND assigned_worker_id=? LIMIT 1");
-        $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
-
-        $conn->commit();
-        echo json_encode(['ok'=>true]); exit;
-      }catch(Throwable $e){
-        $conn->rollback(); http_response_code(500);
-        echo json_encode(['ok'=>false,'msg'=>$e->getMessage()]); exit;
-      }
-    }
-
-    if ($action === 'on_the_way') {
-      $bid = (int)($_POST['booking_id'] ?? 0);
-      if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
-      $st = $conn->prepare("UPDATE bookings SET status='on_the_way' WHERE id=? AND assigned_worker_id=? AND status IN ('approved','assigned') LIMIT 1");
-      $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
-      echo json_encode(['ok'=>true]); exit;
-    }
-
-    if ($action === 'arrived') {
-      $bid = (int)($_POST['booking_id'] ?? 0);
-      $wlat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
-      $wlng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
-      if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
-
-      $st = $conn->prepare("SELECT lat,lng FROM bookings WHERE id=? AND assigned_worker_id=? LIMIT 1");
-      $st->bind_param("ii",$bid,$workerId); $st->execute();
-      $row = $st->get_result()->fetch_assoc(); $st->close();
-      if (!$row) { echo json_encode(['ok'=>false,'msg'=>'Booking not found or not assigned to you']); exit; }
-
-      $blat = $row['lat']; $blng = $row['lng'];
-      if ($blat !== null && $blng !== null && $wlat !== null && $wlng !== null) {
-        $dist = haversine_m((float)$blat,(float)$blng,$wlat,$wlng);
-        if ($dist !== null && $dist > 150) { echo json_encode(['ok'=>false,'msg'=>'You are too far from the job location ('.$dist.' m)']); exit; }
-      }
-      $st = $conn->prepare("UPDATE bookings SET status='arrived', arrived_at=NOW() WHERE id=? AND assigned_worker_id=? LIMIT 1");
-      $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
-      echo json_encode(['ok'=>true]); exit;
-    }
-
     if ($action === 'start_job') {
       $bid = (int)($_POST['booking_id'] ?? 0);
       if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
-      $st = $conn->prepare("UPDATE bookings SET status='in_progress', started_at=NOW() WHERE id=? AND assigned_worker_id=? AND status IN ('arrived','approved','on_the_way') LIMIT 1");
-      $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
+      $st = $conn->prepare("UPDATE bookings SET status='in_progress', started_at=NOW() WHERE id=? AND assigned_worker_id=? AND status='approved' LIMIT 1");
+      $st->bind_param("ii",$bid,$workerId); $st->execute();
       echo json_encode(['ok'=>true]); exit;
     }
 
@@ -211,9 +157,27 @@ if (isset($_GET['ajax']) && $_GET['ajax']==='1') {
       if ($needOtp && $otp === '') { echo json_encode(['ok'=>false,'msg'=>'OTP required']); exit; }
       if ($needOtp && strcasecmp($otp,$bk['completion_otp']) !== 0) { echo json_encode(['ok'=>false,'msg'=>'Invalid OTP']); exit; }
 
-      $st = $conn->prepare("UPDATE bookings SET status='completed', finished_at=NOW() WHERE id=? AND assigned_worker_id=? AND status IN ('in_progress','arrived','approved','on_the_way') LIMIT 1");
+      $st = $conn->prepare("UPDATE bookings SET status='completed', finished_at=NOW() WHERE id=? AND assigned_worker_id=? AND status='in_progress' LIMIT 1");
       $st->bind_param("ii",$bid,$workerId); $st->execute(); $st->close();
       echo json_encode(['ok'=>true]); exit;
+    }
+
+    /* === NEW: decline job (approved -> cancel) === */
+    if ($action === 'cancel_job') {
+      $bid = (int)($_POST['booking_id'] ?? 0);
+      if (!$workerId || $bid<=0) { echo json_encode(['ok'=>false,'msg'=>'Invalid']); exit; }
+
+      // Only allow cancelling if it is still approved (not started)
+      $st = $conn->prepare("UPDATE bookings SET status='cancel' WHERE id=? AND assigned_worker_id=? AND status='approved' LIMIT 1");
+      $st->bind_param("ii",$bid,$workerId);
+      $st->execute();
+      if ($st->affected_rows > 0) {
+        $st->close();
+        echo json_encode(['ok'=>true]); exit;
+      } else {
+        $st->close();
+        echo json_encode(['ok'=>false,'msg'=>'Unable to cancel (maybe already started or not assigned).']); exit;
+      }
     }
 
     echo json_encode(['ok'=>false,'msg'=>'Unknown action']); exit;
@@ -235,23 +199,23 @@ if ($profile) {
 
 /* ---- include optional columns and custom_details in SELECTs ---- */
 $hasAddress   = col_exists($conn,'bookings','address');
-$hasCustomDet = col_exists($conn,'bookings','custom_details'); // NEW
+$hasCustomDet = col_exists($conn,'bookings','custom_details');
 $hasNotes     = col_exists($conn,'bookings','notes');
 
 $commonCols = "b.id,b.ref_code,b.service,b.area"
             . ($hasAddress   ? ",b.address"        : "")
-            . ($hasCustomDet ? ",b.custom_details" : "") // NEW
+            . ($hasCustomDet ? ",b.custom_details" : "")
             . ",b.lat,b.lng,b.date,b.time_slot,b.status,b.estimated_price";
 
 /* helper used to render a compact address-notes preview */
 function tidy_details_preview(?string $raw): string {
   $t = (string)$raw;
   if ($t === '') return '';
-  $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');     // decode &#13; etc.
-  $t = preg_replace('/(?:\r\n|\r|\n){2}\[Property\][\s\S]*$/u', '', $t); // drop auto property block
+  $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+  $t = preg_replace('/(?:\r\n|\r|\n){2}\[Property\][\s\S]*$/u', '', $t);
   $t = trim($t);
   if ($t === '') return '';
-  $t = preg_replace('/\s+/', ' ', $t); // one-liner
+  $t = preg_replace('/\s+/', ' ', $t);
   if (mb_strlen($t,'UTF-8') > 140) $t = mb_substr($t, 0, 140, 'UTF-8').'…';
   return htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
 }
@@ -260,24 +224,24 @@ $kpi_today=$kpi_needs=$kpi_month=0; $kpi_earn=0.00;
 $todayJobs=[]; $upcoming=[];
 
 if ($workerId > 0) {
-  // Today count
-  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND date=? AND status IN ('assigned','approved','on_the_way','arrived','in_progress')");
+  // Today count: approved or in_progress
+  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND date=? AND status IN ('approved','in_progress')");
   $s->bind_param("is",$workerId,$today); $s->execute();
   $kpi_today = (int)$s->get_result()->fetch_assoc()['c']; $s->close();
 
-  // Needs my action
-  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND status='assigned' AND date>=?");
+  // Needs my action = approved (today or future)
+  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND status='approved' AND date>=?");
   $s->bind_param("is",$workerId,$today); $s->execute();
   $kpi_needs = (int)$s->get_result()->fetch_assoc()['c']; $s->close();
 
-  // Month counts
+  // Month counts: approved + in_progress + completed
   $firstDay = date('Y-m-01'); $lastDay = date('Y-m-t');
-  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND status IN ('assigned','approved','on_the_way','arrived','in_progress','completed') AND date BETWEEN ? AND ?");
+  $s = $conn->prepare("SELECT COUNT(*) c FROM bookings WHERE assigned_worker_id=? AND status IN ('approved','in_progress','completed') AND date BETWEEN ? AND ?");
   $s->bind_param("iss",$workerId,$firstDay,$lastDay); $s->execute();
   $kpi_month = (int)$s->get_result()->fetch_assoc()['c']; $s->close();
 
-  // Earnings placeholder
-  $s = $conn->prepare("SELECT COALESCE(SUM(estimated_price),0) s FROM bookings WHERE assigned_worker_id=? AND status IN ('approved','completed') AND date BETWEEN ? AND ?");
+  // Earnings (this month): completed only
+  $s = $conn->prepare("SELECT COALESCE(SUM(estimated_price),0) s FROM bookings WHERE assigned_worker_id=? AND status IN ('completed') AND date BETWEEN ? AND ?");
   $s->bind_param("iss",$workerId,$firstDay,$lastDay); $s->execute();
   $kpi_earn = (float)$s->get_result()->fetch_assoc()['s']; $s->close();
 
@@ -290,18 +254,18 @@ if ($workerId > 0) {
     SELECT $colsToday
     FROM bookings b
     JOIN users u ON u.id=b.user_id
-    WHERE b.assigned_worker_id=? AND b.date=? AND b.status IN ('assigned','approved','on_the_way','arrived','in_progress')
+    WHERE b.assigned_worker_id=? AND b.date=? AND b.status IN ('approved','in_progress')
     ORDER BY b.time_slot ASC, b.id ASC";
   $q = $conn->prepare($sqlToday);
   $q->bind_param("is",$workerId,$today); $q->execute();
   $todayJobs = $q->get_result()->fetch_all(MYSQLI_ASSOC); $q->close();
 
-  // Upcoming 7 days
+  // Upcoming (approved or in_progress) next 30 days
   $sqlUp = "
     SELECT $colsUpc
     FROM bookings b
     JOIN users u ON u.id=b.user_id
-    WHERE b.assigned_worker_id=? AND b.status IN ('assigned','approved','on_the_way','arrived','in_progress') AND b.date BETWEEN ? AND ?
+    WHERE b.assigned_worker_id=? AND b.status IN ('approved','in_progress') AND b.date BETWEEN ? AND ?
     ORDER BY b.date ASC, b.time_slot ASC
     LIMIT 30";
   $q = $conn->prepare($sqlUp);
@@ -317,7 +281,7 @@ if ($workerId > 0) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{ --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --bg:#f6f7fb; --brand:#10b981; --brand-600:#059669; }
+  :root{ --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --bg:#f6f7fb; --brand:#10b981; --brand-600:#059669; --danger:#ef4444; --danger-700:#b91c1c; }
   *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#efefef}
   .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
   .side{background:#0f172a;color:#cbd5e1;padding:20px;display:flex;flex-direction:column;gap:16px}
@@ -337,16 +301,15 @@ if ($workerId > 0) {
   th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
   thead th{background:#f8fafc}
   .tag{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
-  .tag.assigned{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
   .tag.approved{background:#ecfdf5;color:#065f46;border-color:#bbf7d0}
-  .tag.on_the_way{background:#e0f2fe;color:#075985;border-color:#bae6fd}
-  .tag.arrived{background:#f5f3ff;color:#5b21b6;border-color:#ddd6fe}
   .tag.in_progress{background:#fef9c3;color:#854d0e;border-color:#fde68a}
   .tag.completed{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+  .tag.cancel{background:#fee2e2;color:#7f1d1d;border-color:#fecaca}
   .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:700}
   .btn.brand{background:var(--brand);border-color:var(--brand);color:#fff}
   .btn.brand:hover{background:var(--brand-600)}
-  .btn.danger{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+  .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+  .btn.danger:hover{background:var(--danger-700)}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .small{color:#64748b;font-size:12px}
   .select{height:36px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff}
@@ -415,8 +378,8 @@ if ($workerId > 0) {
       <section class="kpis">
         <div class="card kpi"><h4>Today’s Jobs</h4><div class="v"><?= (int)$kpi_today ?></div></div>
         <div class="card kpi"><h4>Needs My Action</h4><div class="v"><?= (int)$kpi_needs ?></div></div>
-        <div class="card kpi"><h4>Assigned/Approved (This Month)</h4><div class="v"><?= (int)$kpi_month ?></div></div>
-        <div class="card kpi"><h4>Projected Earnings (This Month)</h4><div class="v">RM <?= number_format($kpi_earn,2) ?></div></div>
+        <div class="card kpi"><h4>Active/Completed (This Month)</h4><div class="v"><?= (int)$kpi_month ?></div></div>
+        <div class="card kpi"><h4>Earnings (Completed)</h4><div class="v">RM <?= number_format($kpi_earn,2) ?></div></div>
       </section>
 
       <section class="grid2">
@@ -439,10 +402,9 @@ if ($workerId > 0) {
                     ? ('https://www.google.com/maps/dir/?api=1&destination='.rawurlencode($j['lat'].','.$j['lng']))
                     : ('https://www.google.com/maps/search/?api=1&query='.rawurlencode($searchQuery));
                   $price = isset($j['estimated_price']) && $j['estimated_price']!==null ? number_format((float)$j['estimated_price'],2) : '—';
+                  $windowOK = in_action_window($j['date'], $j['time_slot']);
                 ?>
-                  <tr data-id="<?= (int)$j['id'] ?>"
-                      data-date="<?= h($j['date']) ?>"
-                      data-timeslot="<?= h($j['time_slot']) ?>">
+                  <tr data-id="<?= (int)$j['id'] ?>">
                     <td><strong><?= h($j['ref_code'] ?: ('#'.$j['id'])) ?></strong></td>
                     <td><?= h($j['customer_name']) ?><div class="small"><?= h($j['customer_phone'] ?: '') ?></div></td>
                     <td><?= h($j['service']) ?></td>
@@ -465,25 +427,16 @@ if ($workerId > 0) {
                         '&booking_ref='.urlencode($j['ref_code'] ?: ('#'.$j['id']))
                       ?>">💬 Chat</a>
 
-                      <?php if ($j['status']==='assigned'): ?>
-                        <button class="btn brand ack gated">Acknowledge</button>
-                        <button class="btn danger decline gated">Decline</button>
+                      <?php if ($j['status']==='approved' && $windowOK): ?>
+                        <button class="btn brand start">Start job</button>
                       <?php endif; ?>
 
-                      <?php if (in_array($j['status'],['approved','assigned'])): ?>
-                        <button class="btn ontheway gated">On the way</button>
+                      <?php if ($j['status']==='in_progress' && $windowOK): ?>
+                        <button class="btn brand finish">Finish job</button>
                       <?php endif; ?>
 
-                      <?php if (in_array($j['status'],['approved','on_the_way'])): ?>
-                        <button class="btn arrived gated">Arrived</button>
-                      <?php endif; ?>
-
-                      <?php if (in_array($j['status'],['arrived','approved','on_the_way'])): ?>
-                        <button class="btn brand start gated">Start job</button>
-                      <?php endif; ?>
-
-                      <?php if (in_array($j['status'],['in_progress','arrived','approved','on_the_way'])): ?>
-                        <button class="btn brand finish gated">Finish job</button>
+                      <?php if ($j['status']==='approved'): ?>
+                        <button class="btn danger decline">Decline</button>
                       <?php endif; ?>
                     </td>
                   </tr>
@@ -495,7 +448,7 @@ if ($workerId > 0) {
         </div>
 
         <div class="card">
-          <h3 style="margin:0 0 8px">Upcoming (7 days)</h3>
+          <h3 style="margin:0 0 8px">Upcoming (30 days)</h3>
           <?php if (!$upcoming): ?>
             <div class="small">Nothing scheduled.</div>
           <?php else: ?>
@@ -513,10 +466,9 @@ if ($workerId > 0) {
                     ? ('https://www.google.com/maps/dir/?api=1&destination='.rawurlencode($u['lat'].','.$u['lng']))
                     : ('https://www.google.com/maps/search/?api=1&query='.rawurlencode($searchQuery));
                   $price = isset($u['estimated_price']) && $u['estimated_price']!==null ? number_format((float)$u['estimated_price'],2) : '—';
+                  $windowOK = in_action_window($u['date'], $u['time_slot']);
                 ?>
-                  <tr data-id="<?= (int)$u['id'] ?>"
-                      data-date="<?= h($u['date']) ?>"
-                      data-timeslot="<?= h($u['time_slot']) ?>">
+                  <tr data-id="<?= (int)$u['id'] ?>">
                     <td><strong><?= h($u['ref_code'] ?: ('#'.$u['id'])) ?></strong></td>
                     <td><?= h($u['customer_name']) ?></td>
                     <td><?= h($u['service']) ?></td>
@@ -533,32 +485,22 @@ if ($workerId > 0) {
                     <td>RM <?= $price ?></td>
                     <td><span class="tag <?= h($u['status']) ?>"><?= ucfirst(str_replace('_',' ',h($u['status']))) ?></span></td>
                     <td class="row">
-                      <!-- <a class="btn navbtn" data-nav="<?= h($navUrl) ?>">🚘 Navigate</a> -->
                       <a class="btn" href="<?=
                         'contact_chat_worker.php?worker_id='.$workerId.
                         '&booking_id='.(int)$u['id'].
                         '&booking_ref='.urlencode($u['ref_code'] ?: ('#'.$u['id']))
                       ?>">💬 Chat</a>
 
-                      <?php if ($u['status']==='assigned'): ?>
-                        <button class="btn brand ack gated">Acknowledge</button>
-                        <button class="btn danger decline gated">Decline</button>
+                      <?php if ($u['status']==='approved' && $windowOK): ?>
+                        <button class="btn brand start">Start job</button>
                       <?php endif; ?>
 
-                      <?php if (in_array($u['status'],['approved','assigned'])): ?>
-                        <button class="btn ontheway gated">On the way</button>
+                      <?php if ($u['status']==='in_progress' && $windowOK): ?>
+                        <button class="btn brand finish">Finish job</button>
                       <?php endif; ?>
 
-                      <?php if (in_array($u['status'],['approved','on_the_way'])): ?>
-                        <button class="btn arrived gated">Arrived</button>
-                      <?php endif; ?>
-
-                      <?php if (in_array($u['status'],['arrived','approved','on_the_way'])): ?>
-                        <button class="btn brand start gated">Start job</button>
-                      <?php endif; ?>
-
-                      <?php if (in_array($u['status'],['in_progress','arrived','approved','on_the_way'])): ?>
-                        <button class="btn brand finish gated">Finish job</button>
+                      <?php if ($u['status']==='approved'): ?>
+                        <button class="btn danger decline">Decline</button>
                       <?php endif; ?>
                     </td>
                   </tr>
@@ -574,9 +516,6 @@ if ($workerId > 0) {
 </div>
 
 <script>
-/* ==== Config: action window (minutes) ==== */
-const ACTION_WINDOW_MIN = 120; // actions enabled within ±120 minutes of start
-
 /* Link profile */
 const linkBtn = document.getElementById('linkBtn');
 if (linkBtn) {
@@ -611,7 +550,7 @@ if (availSel){
 
 /* Nav button opens link reliably */
 document.querySelectorAll('.navbtn').forEach(a=>{
-  a.addEventListener('click', (e)=>{
+  a.addEventListener('click', ()=>{
     const url = a.getAttribute('data-nav');
     if(url) window.open(url, '_blank');
   });
@@ -620,8 +559,13 @@ document.querySelectorAll('.navbtn').forEach(a=>{
 /* Helpers */
 function rowBookingId(btn){ return btn.closest('tr')?.getAttribute('data-id'); }
 function setRowStatus(btn, s){
-  const tag = btn.closest('tr').querySelector('.tag');
+  const tr  = btn.closest('tr');
+  const tag = tr.querySelector('.tag');
   if(tag){ tag.className='tag '+s; tag.textContent=s.replace(/_/g,' ').replace(/^\w/,c=>c.toUpperCase()); }
+  // After terminal actions, disable buttons in that row
+  if (['completed','cancel'].includes(s)) {
+    tr.querySelectorAll('button').forEach(b=>b.disabled = true);
+  }
 }
 async function postAction(action, payload){
   const res = await fetch('worker_dashboard.php?ajax=1', {
@@ -629,136 +573,23 @@ async function postAction(action, payload){
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({action, ...payload})
   });
-  let j=null; try{ j=await res.json(); }catch{}
+  let j=null; try{j=await res.json();}catch{}
   return j;
 }
 
-/* Time gating: enable actions only near the slot */
-function parseStart(dateStr, slotStr){
-  if(!dateStr) return null;
-  const base = new Date(dateStr + 'T00:00:00');
-  if (!slotStr) return base;
-  let hh=9, mm=0;
-  const s = slotStr.trim().toLowerCase();
-  let m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-  if(m){
-    hh = parseInt(m[1],10); mm = m[2]?parseInt(m[2],10):0;
-    const ap = m[3]||'';
-    if(ap==='pm' && hh<12) hh+=12;
-    if(ap==='am' && hh===12) hh=0;
-  } else if (s.includes('-')) {
-    const left = s.split('-')[0].trim();
-    m = left.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-    if(m){
-      hh = parseInt(m[1],10); mm = m[2]?parseInt(m[2],10):0;
-      const ap = m[3]||'';
-      if(ap==='pm' && hh<12) hh+=12;
-      if(ap==='am' && hh===12) hh=0;
-    }
-  }
-  const dt = new Date(base);
-  dt.setHours(hh, mm, 0, 0);
-  return dt;
-}
-
-function gateButtons(){
-  const now = new Date();
-  document.querySelectorAll('tr[data-date]').forEach(tr=>{
-    const dateStr = tr.getAttribute('data-date');
-    const slotStr = tr.getAttribute('data-timeslot') || '';
-    const start = parseStart(dateStr, slotStr);
-    const gatedBtns = tr.querySelectorAll('.gated');
-    if(!start){
-      gatedBtns.forEach(b=>{ b.disabled = true; b.title = 'Disabled: no start time'; });
-      return;
-    }
-    const diffMin = Math.abs((now - start)/60000);
-    const inWindow = diffMin <= ACTION_WINDOW_MIN && now >= new Date(dateStr+'T00:00:00');
-    gatedBtns.forEach(b=>{
-      b.disabled = !inWindow;
-      b.title = inWindow ? '' : `Available within ±${ACTION_WINDOW_MIN} min of start time`;
-    });
-  });
-}
-gateButtons();
-setInterval(gateButtons, 60*1000);
-
-/* Actions */
-// Acknowledge
-document.querySelectorAll('.ack').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const id = rowBookingId(b); if(!id) return;
-    b.disabled = true;
-    const j = await postAction('ack_job',{booking_id:id});
-    b.disabled = false;
-    if(j?.ok){ setRowStatus(b,'approved'); } else { alert(j?.msg || 'Failed'); }
-  });
-});
-
-// Decline with reason
-document.querySelectorAll('.decline').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const id = rowBookingId(b); if(!id) return;
-    const reason = prompt('Please provide a short reason for declining (required):');
-    if (reason === null) return;
-    const trimmed = (reason || '').trim();
-    if (!trimmed) { alert('Decline reason is required.'); return; }
-    b.disabled = true;
-    const j = await postAction('decline_job',{booking_id:id, reason: trimmed});
-    b.disabled = false;
-    if(j?.ok){
-      const tr=b.closest('tr'); tr.style.opacity=.6; tr.style.pointerEvents='none';
-      setRowStatus(b,'pending');
-    } else { alert(j?.msg || 'Failed'); }
-  });
-});
-
-// On the way
-document.querySelectorAll('.ontheway').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const id = rowBookingId(b); if(!id) return;
-    b.disabled = true;
-    const j = await postAction('on_the_way',{booking_id:id});
-    b.disabled = false;
-    if(j?.ok){ setRowStatus(b,'on_the_way'); } else { alert(j?.msg || 'Failed'); }
-  });
-});
-
-// Arrived — capture GPS if allowed
-async function getGeo(){
-  return new Promise(resolve=>{
-    if(!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      p=>resolve({lat:p.coords.latitude, lng:p.coords.longitude}),
-      _=>resolve(null),
-      {enableHighAccuracy:true, timeout:8000, maximumAge:0}
-    );
-  });
-}
-document.querySelectorAll('.arrived').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const id = rowBookingId(b); if(!id) return;
-    b.disabled = true;
-    const g = await getGeo();
-    const payload = g ? {booking_id:id, lat:g.lat, lng:g.lng} : {booking_id:id};
-    const j = await postAction('arrived', payload);
-    b.disabled = false;
-    if(j?.ok){ setRowStatus(b,'arrived'); } else { alert(j?.msg || 'Failed'); }
-  });
-});
-
-// Start job
+/* Start job (approved -> in_progress) */
 document.querySelectorAll('.start').forEach(b=>{
   b.addEventListener('click', async ()=>{
     const id = rowBookingId(b); if(!id) return;
     b.disabled = true;
     const j = await postAction('start_job',{booking_id:id});
     b.disabled = false;
-    if(j?.ok){ setRowStatus(b,'in_progress'); } else { alert(j?.msg || 'Failed'); }
+    if(j?.ok){ setRowStatus(b,'in_progress'); }
+    else { alert(j?.msg || 'Failed to start'); }
   });
 });
 
-// Finish job (OTP optional)
+/* Finish job (in_progress -> completed, OTP optional) */
 document.querySelectorAll('.finish').forEach(b=>{
   b.addEventListener('click', async ()=>{
     const id = rowBookingId(b); if(!id) return;
@@ -766,7 +597,21 @@ document.querySelectorAll('.finish').forEach(b=>{
     b.disabled = true;
     const j = await postAction('finish_job',{booking_id:id, otp: (otp||'')});
     b.disabled = false;
-    if(j?.ok){ setRowStatus(b,'completed'); } else { alert(j?.msg || 'Failed'); }
+    if(j?.ok){ setRowStatus(b,'completed'); }
+    else { alert(j?.msg || 'Failed to finish'); }
+  });
+});
+
+/* === NEW: Decline (approved -> cancel) === */
+document.querySelectorAll('.decline').forEach(b=>{
+  b.addEventListener('click', async ()=>{
+    const id = rowBookingId(b); if(!id) return;
+    if(!confirm('Decline this job? This will mark it as cancelled for you.')) return;
+    b.disabled = true;
+    const j = await postAction('cancel_job',{booking_id:id});
+    b.disabled = false;
+    if(j?.ok){ setRowStatus(b,'cancel'); }
+    else { alert(j?.msg || 'Failed to cancel'); }
   });
 });
 </script>

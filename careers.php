@@ -1,5 +1,5 @@
 <?php
-// careers.php — NeinMaid Careers (redirect to worker registration)
+// careers.php — NeinMaid Careers (user theme navbar + footer)
 session_start();
 $isAuth = isset($_SESSION['user_id']);
 $name   = $isAuth ? ($_SESSION['name'] ?? "Guest") : "Guest";
@@ -14,7 +14,7 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
   <meta name="description" content="Join NeinMaid as a cleaner in Penang. Flexible hours, weekly payouts, fair jobs. Apply online in minutes." />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
-    /* ===== Global theme (matches user_dashboard) ===== */
+    /* ===== User theme (matches user_dashboard) ===== */
     :root{
       --bg:#f8fafc; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
       --brand:#b91c1c; --brand-2:#ef4444; --ink-2:#111827;
@@ -27,7 +27,7 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
     a{color:inherit;text-decoration:none}
     img{display:block;max-width:100%}
 
-    /* ===== Navbar ===== */
+    /* ===== Navbar (identical to user_dashboard) ===== */
     .header{
       position:sticky; top:0; z-index:1000;
       background:rgba(255,255,255,.9);
@@ -73,6 +73,19 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
     .mobile-search{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
     @media (max-width:900px){ .nav-center{display:none} .hamburger{display:inline-flex} }
 
+    /* ===== Footer (identical to user_dashboard) ===== */
+    .footer{background:#0f172a;color:#e5e7eb;margin-top:20px}
+    .footgrid{
+      max-width:1100px;margin:0 auto;
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:16px;padding:16px 12px
+    }
+    .copyright{
+      max-width:1100px;margin:0 auto;color:#94a3b8;
+      display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;
+      padding:10px 12px;border-top:1px solid #1f2937
+    }
+
     /* ===== Page layout ===== */
     .wrap{max-width:1100px;margin:18px auto;padding:0 12px}
     .hero{
@@ -105,10 +118,9 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
       </div>
 
       <div class="nav-center">
-        <a class="nav-link" href="user_dashboard.php#services">Services</a>
-        <a class="nav-link" href="user_dashboard.php#pricing">Pricing</a>
+        <!-- Keep links consistent with user_dashboard -->
+        <a class="nav-link" href="user_dashboard.php">Home</a>
         <a class="nav-link" href="booking_success.php">Booking</a>
-        <a class="nav-link active" href="careers.php">Careers</a>
         <a class="nav-link" href="contact_chat.php">Messages</a>
         <a class="nav-link" href="user_profile.php">Profile</a>
         <div class="nav-search" role="search">
@@ -246,6 +258,39 @@ function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
       </details>
     </section>
   </main>
+
+  <!-- ===== Footer (exact copy from user_dashboard) ===== -->
+  <footer class="footer">
+    <div class="footgrid">
+      <div>
+        <div style="font-weight:800;font-size:18px;margin-bottom:8px">NeinMaid</div>
+        <div style="color:#d1d5db">Professional maid & cleaning services in Penang.</div>
+        <div style="margin-top:10px;color:#d1d5db">Currently serving Penang only.</div>
+      </div>
+      <div>
+        <div style="font-weight:800;margin-bottom:8px">Company</div>
+        <div><a href="about.php">About</a></div>
+        <div><a href="careers.php">Careers</a></div>
+        <div><a href="contact_chat.php">Contact</a></div>
+      </div>
+      <div>
+        <div style="font-weight:800;margin-bottom:8px">Services</div>
+        <div><a href="user_dashboard.php#services">House Cleaning</a></div>
+        <div><a href="user_dashboard.php#services">Deep Cleaning</a></div>
+        <div><a href="user_dashboard.php#services">Office Cleaning</a></div>
+        <div><a href="user_dashboard.php#services">Move In/Out</a></div>
+      </div>
+      <div>
+        <div style="font-weight:800;margin-bottom:8px">Help</div>
+        <div><a href="contact_chat.php">Support</a></div>
+        <div><a href="faq.php">FAQs</a></div>
+      </div>
+    </div>
+    <div class="copyright">
+      <div>© <?= date('Y') ?> NeinMaid • All rights reserved</div>
+      <div>Made with ❤️ in Penang</div>
+    </div>
+  </footer>
 
   <script>
     /* Navbar behavior + dashboard search redirect */

@@ -354,7 +354,7 @@ $list = $conn->query("SELECT id, name, email, phone, whatsapp, nationality, ic_n
 <body>
 
 <div class="layout">
-  <!-- Sidebar (same as dashboard) -->
+  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="brand">
       <img src="maid.png" alt="NeinMaid">
@@ -362,13 +362,14 @@ $list = $conn->query("SELECT id, name, email, phone, whatsapp, nationality, ic_n
     </div>
 
     <div class="nav">
-      <a href="admin_dashboard.php">Dashboard</a>
+      <a class="active" href="admin_dashboard.php">Dashboard</a>
       <a href="admin_bookings.php">Bookings</a>
-      <a class="active" href="admin_employees.php">Workers</a>
+      <a href="admin_employees.php">Workers</a>
       <a href="admin_services.php">Services</a>
       <a href="admin_finance.php">Finance</a>
       <a href="admin_promos.php">Promotions</a>
       <a href="admin_worker_changes.php">Worker Changes</a>
+      <a href="admin_chat.php">Support Chat</a>
       <a href="logout.php" class="logout">Logout</a>
     </div>
   </aside>

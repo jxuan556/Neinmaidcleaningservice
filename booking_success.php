@@ -115,16 +115,17 @@ foreach ($all as $b) $buckets[bucket_for($b,$TZ)][] = $b;
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* ====== Shared look with user_dashboard (Navbar + spacing fix) ====== */
+/* ===== Shared user theme (matches user_dashboard) ===== */
 :root{
   --bg:#f8fafc; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
-  --brand:#b91c1c; --brand-2:#ef4444; --ink-2:#111827;
+  --brand:#b91c1c; --brand-2:#ef4444; --ink-2:#111827; --shadow:0 10px 30px rgba(2,6,23,.08);
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink)}
 a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
 
-/* Navbar */
+/* Navbar (identical to user_dashboard) */
 .header{
   position:sticky; top:0; z-index:1000;
   background:rgba(255,255,255,.9);
@@ -132,17 +133,11 @@ a{color:inherit;text-decoration:none}
   border-bottom:1px solid var(--line);
   transition: box-shadow .2s ease, border-color .2s ease, background .2s ease;
 }
-.header.scrolled{ background:#fff; box-shadow:0 10px 30px rgba(2,6,23,.08); border-color:#e2e8f0; }
+.header.scrolled{ background:#fff; box-shadow:var(--shadow); border-color:#e2e8f0; }
 .nav-wrap{
   max-width:1200px;margin:0 auto;padding:10px 16px;
-  display:grid; grid-template-columns:auto 1fr auto; /* centered links */
+  display:grid; grid-template-columns:auto 1fr auto;
   align-items:center; gap:10px;
-}
-/* extra separation between brand and first link (fixes logo/Services conflict) */
-@media (min-width:901px){
-  .nav-wrap{ column-gap:28px; }
-  .brand{ padding-right:14px; }
-  .nav-center{ padding-left:16px; border-left:1px solid var(--line); }
 }
 .brand{display:flex;align-items:center;gap:10px}
 .brand img{width:30px;height:30px}
@@ -169,9 +164,27 @@ a{color:inherit;text-decoration:none}
 .mobile-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mobile-actions{display:flex;gap:8px;flex-wrap:wrap}
 .mobile-search{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+@media (min-width:901px){
+  .nav-wrap{ column-gap:28px; }
+  .brand{ padding-right:14px; }
+  .nav-center{ padding-left:16px; border-left:1px solid var(--line); }
+}
 @media (max-width:900px){ .nav-center{display:none} .hamburger{display:inline-flex} }
 
-/* ====== Page styles (kept from your original list UI) ====== */
+/* Footer (identical to user_dashboard) */
+.footer{background:#0f172a;color:#e5e7eb;margin-top:20px}
+.footgrid{
+  max-width:1100px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;padding:16px 12px
+}
+.copyright{
+  max-width:1100px;margin:0 auto;color:#94a3b8;
+  display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;
+  padding:10px 12px;border-top:1px solid #1f2937
+}
+
+/* ===== Page styles (bookings list) ===== */
 .wrap{max-width:980px;margin:20px auto;padding:0 12px}
 .bucket{margin-bottom:24px}
 .bucket h2{font-size:20px;font-weight:800;margin:10px 0}
@@ -204,7 +217,7 @@ a{color:inherit;text-decoration:none}
 </head>
 <body>
 
-<!-- ===== Navbar (same as user_dashboard) ===== -->
+<!-- ===== Navbar (exact copy from user_dashboard) ===== -->
 <header id="siteHeader" class="header">
   <div class="nav-wrap" aria-label="Primary">
     <!-- Left: brand -->
@@ -213,11 +226,10 @@ a{color:inherit;text-decoration:none}
       <div class="brand-name">NeinMaid</div>
     </div>
 
-    <!-- Center: links + search (hidden on small screens) -->
+    <!-- Center: links + search -->
     <div class="nav-center">
-      <a class="nav-link" href="user_dashboard.php#services">Services</a>
-      <a class="nav-link" href="user_dashboard.php#pricing">Pricing</a>
-      <a class="nav-link" href="booking_success.php">Booking</a>
+      <!-- Keep these links identical to user_dashboard -->
+      <a class="nav-link" href="user_dashboard.php">Home</a>
       <a class="nav-link" href="careers.php">Careers</a>
       <a class="nav-link" href="contact_chat.php">Messages</a>
       <a class="nav-link" href="user_profile.php">Profile</a>
@@ -373,6 +385,39 @@ a{color:inherit;text-decoration:none}
 <?php endforeach; ?>
 </div>
 
+<!-- Footer (exact copy from user_dashboard) -->
+<footer class="footer">
+  <div class="footgrid">
+    <div>
+      <div style="font-weight:800;font-size:18px;margin-bottom:8px">NeinMaid</div>
+      <div style="color:#d1d5db">Professional maid & cleaning services in Penang.</div>
+      <div style="margin-top:10px;color:#d1d5db">Currently serving Penang only.</div>
+    </div>
+    <div>
+      <div style="font-weight:800;margin-bottom:8px">Company</div>
+      <div><a href="about.php">About</a></div>
+      <div><a href="careers.php">Careers</a></div>
+      <div><a href="contact_chat.php">Contact</a></div>
+    </div>
+    <div>
+      <div style="font-weight:800;margin-bottom:8px">Services</div>
+      <div><a href="user_dashboard.php#services">House Cleaning</a></div>
+      <div><a href="user_dashboard.php#services">Deep Cleaning</a></div>
+      <div><a href="user_dashboard.php#services">Office Cleaning</a></div>
+      <div><a href="user_dashboard.php#services">Move In/Out</a></div>
+    </div>
+    <div>
+      <div style="font-weight:800;margin-bottom:8px">Help</div>
+      <div><a href="contact_chat.php">Support</a></div>
+      <div><a href="faq.php">FAQs</a></div>
+    </div>
+  </div>
+  <div class="copyright">
+    <div>© <?= date('Y') ?> NeinMaid • All rights reserved</div>
+    <div>Made with ❤️ in Penang</div>
+  </div>
+</footer>
+
 <!-- Reschedule modal -->
 <div id="reschedBack" class="modal-backdrop" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reschedTitle">
@@ -390,7 +435,6 @@ a{color:inherit;text-decoration:none}
         </div>
         <div>
           <label for="reschedTime"><strong>New time</strong></label>
-          <!-- step=1800 => 30 minutes; optionally add min/max like min="08:00" max="20:00" -->
           <input class="input" type="time" name="time" id="reschedTime" required step="1800">
         </div>
       </div>
@@ -418,7 +462,7 @@ a{color:inherit;text-decoration:none}
 <?php endif; ?>
 
 <script>
-/* ===== Navbar behavior + dashboard search redirect ===== */
+/* ===== Navbar behavior + dashboard search redirect (same as user_dashboard) ===== */
 const header = document.getElementById('siteHeader');
 const mobilePanel = document.getElementById('mobilePanel');
 function toggleMenu(){ mobilePanel.classList.toggle('open'); }
@@ -475,7 +519,6 @@ function dashSearch(isMobile=false){
   [closeB, cancel].forEach(el=> el.addEventListener('click', closeModal));
   back.addEventListener('click', (e)=>{ if (e.target === back) closeModal(); });
 
-  // --- snap any free-typed time to :00 or :30 on blur
   function snapToHalfHour(value){
     if(!value) return value;
     const [hStr, mStr='0'] = value.split(':');
@@ -491,7 +534,6 @@ function dashSearch(isMobile=false){
     e.preventDefault();
     msg.style.display = 'none';
 
-    // enforce half-hour in JS before sending
     const t = (timeInp.value || '').trim();
     const parts = t.split(':');
     const mm = parts[1] || '';

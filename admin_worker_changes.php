@@ -69,8 +69,9 @@ $counts['all'] = array_sum($counts);
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin · Worker Changes – NeinMaid</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin_dashboard.css"><!-- reuse dashboard css -->
   <style>
-    /* Dashboard shell */
+    /* === Same shell & navbar as admin_finance.php === */
     body{background:#f6f7fb;color:#0f172a;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
     .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
     .sidebar{background:#fff;border-right:1px solid #e5e7eb;padding:16px 12px}
@@ -78,8 +79,9 @@ $counts['all'] = array_sum($counts);
     .brand img{width:28px;height:28px}
     .nav{display:flex;flex-direction:column;margin-top:12px}
     .nav a{padding:10px 12px;border-radius:10px;color:#111827;text-decoration:none;margin:2px 0}
-    .nav a.active,.nav a:hover{background:#eef2ff}
+    .nav a.active, .nav a:hover{background:#eef2ff}
     .main{padding:18px}
+
     /* Page */
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -106,12 +108,13 @@ $counts['all'] = array_sum($counts);
 <body>
 
 <div class="layout">
-  <!-- Sidebar -->
+  <!-- Sidebar (identical to Finance; active on Worker Changes) -->
   <aside class="sidebar">
     <div class="brand">
       <img src="maid.png" alt="NeinMaid">
       <div>NeinMaid</div>
     </div>
+
     <div class="nav">
       <a href="admin_dashboard.php">Dashboard</a>
       <a href="admin_bookings.php">Bookings</a>
@@ -119,8 +122,9 @@ $counts['all'] = array_sum($counts);
       <a href="admin_services.php">Services</a>
       <a href="admin_finance.php">Finance</a>
       <a href="admin_promos.php">Promotions</a>
-      <a href="admin_worker_changes.php" class="active">Worker Changes</a>
-      <a href="logout.php">Logout</a>
+      <a class="active" href="admin_worker_changes.php">Worker Changes</a>
+      <a href="admin_chat.php">Support Chat</a>
+      <a href="logout.php" class="logout">Logout</a>
     </div>
   </aside>
 
@@ -254,3 +258,4 @@ async function act(id, action){
 </script>
 </body>
 </html>
+

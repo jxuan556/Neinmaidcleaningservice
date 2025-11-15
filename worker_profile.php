@@ -198,7 +198,6 @@ $chipClass = [
         </div>
 
         <div class="actions">
-          <a class="btn back" href="worker_dashboard.php">← Back</a>
           <a class="btn edit" href="worker_profile_edit.php">✏ Edit Profile (Submit for Approval)</a>
         </div>
       </div>

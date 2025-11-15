@@ -286,6 +286,7 @@ function tag($s){
       <a href="admin_finance.php">Finance</a>
       <a href="admin_promos.php">Promotions</a>
       <a href="admin_worker_changes.php">Worker Changes</a>
+      <a href="admin_chat.php">Support Chat</a>
       <a href="logout.php" class="logout">Logout</a>
     </div>
   </aside>

@@ -39,7 +39,7 @@ if ($act === 'ensure_thread') {
   if ($row) ok(['thread_id'=>(int)$row['id']]);
 
   // create new with session name/email if present
-  $name = $_SESSION['name'] ?? 'User';
+  $name  = $_SESSION['name']  ?? 'User';
   $email = $_SESSION['email'] ?? null;
 
   $st = $conn->prepare("INSERT INTO support_threads(user_id,name,email) VALUES(?,?,?)");
@@ -48,25 +48,65 @@ if ($act === 'ensure_thread') {
   ok(['thread_id'=>$tid]);
 }
 
-/* Admin: list threads */
+/* Admin: list threads (party now detects worker by user_id OR email match OR users.role) */
 if ($act === 'admin_list') {
   if (!$isAdmin) jerr('Forbidden', 403);
   $status = ($_GET['status'] ?? 'open') === 'closed' ? 'closed' : 'open';
   $q = trim($_GET['q'] ?? '');
-  $where = "status=?";
+
+  $where = "st.status = ?";
   $types = "s";
   $params = [$status];
+
   if ($q !== '') {
-    $where .= " AND (name LIKE ? OR email LIKE ?)";
+    $where .= " AND (st.name LIKE ? OR st.email LIKE ?)";
     $types .= "ss";
     $like = "%$q%";
-    $params[]=$like; $params[]=$like;
+    $params[] = $like; $params[] = $like;
   }
-  $sql="SELECT id,user_id,name,email,status,last_at,created_at FROM support_threads WHERE $where ORDER BY last_at DESC LIMIT 100";
-  $st=$conn->prepare($sql); $st->bind_param($types, ...$params); $st->execute();
-  $res=$st->get_result()->fetch_all(MYSQLI_ASSOC); $st->close();
-  ok(['threads'=>$res]);
+
+  // NOTE: join users to optionally use users.role, and join worker_profiles by user_id OR email (case-insensitive)
+  $sql = "
+    SELECT
+      st.id,
+      st.user_id,
+      st.name,
+      st.email,
+      st.status,
+      st.last_at,
+      st.created_at,
+      CASE
+        WHEN wp_user.user_id IS NOT NULL
+          OR (wp_email.email IS NOT NULL AND st.email IS NOT NULL AND LOWER(wp_email.email) = LOWER(st.email))
+          OR (u.role = 'worker')
+        THEN 'worker'
+        ELSE 'user'
+      END AS party
+    FROM support_threads st
+    LEFT JOIN users u
+      ON u.id = st.user_id
+    /* worker match by user_id */
+    LEFT JOIN worker_profiles wp_user
+      ON wp_user.user_id = st.user_id
+    /* worker match by email (case-insensitive) */
+    LEFT JOIN worker_profiles wp_email
+      ON wp_email.email IS NOT NULL
+     AND st.email IS NOT NULL
+     AND LOWER(wp_email.email) = LOWER(st.email)
+    WHERE $where
+    ORDER BY COALESCE(st.last_at, st.created_at) DESC
+    LIMIT 100
+  ";
+
+  $st = $conn->prepare($sql);
+  $st->bind_param($types, ...$params);
+  $st->execute();
+  $res = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+  $st->close();
+
+  ok(['threads' => $res]);
 }
+
 
 /* Fetch messages (both roles) */
 if ($act === 'fetch') {

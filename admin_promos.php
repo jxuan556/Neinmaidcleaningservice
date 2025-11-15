@@ -51,8 +51,8 @@ try {
     $min_spend   = ($_POST['min_spend']   !== '') ? (float)$_POST['min_spend']   : null;
     $max_disc    = ($_POST['max_discount']!== '') ? (float)$_POST['max_discount'] : null;
     $usage_limit = ($_POST['usage_limit'] !== '') ? (int)$_POST['usage_limit']   : null;
-    $per_user    = ($has_per_user && $_POST['per_user_limit']!=='') ? (int)$_POST['per_user_limit'] : null;
-    $user_cap    = ($has_user_cap && $_POST['per_user_amount_cap']!=='') ? (float)$_POST['per_user_amount_cap'] : null;
+    $per_user    = ($has_per_user && ($_POST['per_user_limit']??'')!=='') ? (int)$_POST['per_user_limit'] : null;
+    $user_cap    = ($has_user_cap && ($_POST['per_user_amount_cap']??'')!=='') ? (float)$_POST['per_user_amount_cap'] : null;
     $starts_at   = clean($_POST['starts_at']??'');
     $ends_at     = clean($_POST['ends_at']??'');
 
@@ -100,8 +100,8 @@ try {
     $min_spend   = ($_POST['min_spend']   !== '') ? (float)$_POST['min_spend']   : null;
     $max_disc    = ($_POST['max_discount']!== '') ? (float)$_POST['max_discount'] : null;
     $usage_limit = ($_POST['usage_limit'] !== '') ? (int)$_POST['usage_limit']   : null;
-    $per_user    = ($has_per_user && $_POST['per_user_limit']!=='') ? (int)$_POST['per_user_limit'] : null;
-    $user_cap    = ($has_user_cap && $_POST['per_user_amount_cap']!=='') ? (float)$_POST['per_user_amount_cap'] : null;
+    $per_user    = ($has_per_user && ($_POST['per_user_limit']??'')!=='') ? (int)$_POST['per_user_limit'] : null;
+    $user_cap    = ($has_user_cap && ($_POST['per_user_amount_cap']??'')!=='') ? (float)$_POST['per_user_amount_cap'] : null;
     $starts_at   = clean($_POST['starts_at']??'');
     $ends_at     = clean($_POST['ends_at']??'');
 
@@ -174,7 +174,7 @@ try {
     $stmt->bind_param("i",$id);
     $stmt->execute(); $stmt->close();
     $ok="Promo deleted.";
-    if ($editingRow && (int)$editingRow['id']===$id) $editingRow=null; // if you deleted what you were editing
+    if ($editingRow && (int)$editingRow['id']===$id) $editingRow=null;
   }
 
 } catch (Throwable $e) {
@@ -193,43 +193,58 @@ try{
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Admin · Promotions – NeinMaid</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* Dashboard-style shell (matches your other admin pages) */
-  body{background:#f6f7fb;color:#0f172a;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  /* === Shell matches admin_finance.php exactly === */
+  :root{--bg:#f6f7fb;--panel:#fff;--muted:#6b7280;--line:#e5e7eb;--ink:#0f172a;--ink-strong:#111827;--primary:#111827;--danger:#ef4444;--pill:#f8fafc;--pill-line:#e5e7eb;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
   .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-  .sidebar{background:#fff;border-right:1px solid #e5e7eb;padding:16px 12px}
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);padding:16px 12px}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800}
   .brand img{width:28px;height:28px}
   .nav{display:flex;flex-direction:column;margin-top:12px}
-  .nav a{padding:10px 12px;border-radius:10px;color:#111827;text-decoration:none;margin:2px 0}
-  .nav a.active, .nav a:hover{background:#eef2ff}
+  .nav a{padding:10px 12px;border-radius:10px;color:var(--ink-strong);text-decoration:none;margin:2px 0}
+  .nav a.active,.nav a:hover{background:#eef2ff}
   .main{padding:18px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+
+  /* Page UI */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .row-sb{display:flex;justify-content:space-between;align-items:center}
-  .muted{color:#6b7280}
-  .pill{padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#f8fafc}
-  .btn{padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;text-decoration:none;color:#111827}
+  .row-sb{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .muted{color:var(--muted)}
+  .pill{padding:6px 10px;border:1px solid var(--pill-line);border-radius:999px;background:var(--pill);font-size:12px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge.green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+  .badge.gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
+  .badge.amber{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .btn{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;text-decoration:none;color:var(--ink-strong);font-weight:600}
   .btn:hover{background:#f8fafc}
-  .btn-primary{background:#111827;color:#fff;border-color:#111827}
+  .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
   .btn-primary:hover{opacity:.9}
-  .btn-danger{background:#ef4444;color:#fff;border-color:#ef4444}
-  .input, select{padding:8px;border:1px solid #e5e7eb;border-radius:10px;width:100%}
-  .grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px;vertical-align:top}
-  thead th{background:#f8fafc}
-  .ok{background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;padding:10px;border-radius:10px;margin-bottom:12px}
-  .err{background:#fff1f2;border:1px solid #fda4af;color:#991b1b;padding:10px;border-radius:10px;margin-bottom:12px}
-  .actions a, .actions button{margin-right:6px}
+  .btn-danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+  .btn-sm{padding:6px 10px;font-size:13px;border-radius:8px}
+  .input, select{padding:10px;border:1px solid var(--line);border-radius:10px;width:100%;font-size:14px}
+  .help{font-size:12px;color:var(--muted);margin-top:4px}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start}
   @media (max-width:1100px){ .grid{grid-template-columns:1fr} }
+  table{width:100%;border-collapse:separate;border-spacing:0}
+  thead th{position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #eef2f7;z-index:1}
+  th,td{padding:10px 12px;text-align:left;font-size:14px;vertical-align:top;border-bottom:1px solid #f1f5f9}
+  tbody tr:nth-child(even){background:#fcfcfd}
+  .actions{display:flex;gap:6px;flex-wrap:wrap}
+  .ok{background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;padding:10px;border-radius:10px;margin-top:12px}
+  .err{background:#fff1f2;border:1px solid #fda4af;color:#991b1b;padding:10px;border-radius:10px;margin-top:12px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){ .form-grid{grid-template-columns:1fr} }
+  .section-title{font-size:18px;margin:0 0 8px}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
 </style>
 </head>
 <body>
 
 <div class="layout">
-  <!-- Sidebar -->
+  <!-- Sidebar (IDENTICAL to Finance; active on Promotions) -->
   <aside class="sidebar">
     <div class="brand">
       <img src="maid.png" alt="NeinMaid">
@@ -243,6 +258,7 @@ try{
       <a href="admin_finance.php">Finance</a>
       <a class="active" href="admin_promos.php">Promotions</a>
       <a href="admin_worker_changes.php">Worker Changes</a>
+      <a href="admin_chat.php">Support Chat</a>
       <a href="logout.php" class="logout">Logout</a>
     </div>
   </aside>
@@ -252,12 +268,10 @@ try{
     <section class="card">
       <div class="row-sb">
         <h1 style="margin:0">Promotions</h1>
-        <div class="row">
-          <?php if($ok): ?><div class="pill"><?= h($ok) ?></div><?php endif; ?>
-        </div>
       </div>
+      <?php if($ok): ?><div class="ok"><?= h($ok) ?></div><?php endif; ?>
       <?php if($errors): ?>
-        <div class="err" style="margin-top:10px">
+        <div class="err">
           <strong>Please fix:</strong>
           <ul style="margin:8px 0 0 18px">
             <?php foreach($errors as $e) echo '<li>'.h($e).'</li>'; ?>
@@ -266,18 +280,15 @@ try{
       <?php endif; ?>
     </section>
 
-    <section class="grid" style="margin-top:12px">
+    <section class="grid" style="margin-top:16px">
       <!-- List -->
       <div class="card">
-        <div class="row-sb">
-          <h3 style="margin:0">All Promos</h3>
-          <a class="btn" href="admin_dashboard.php">← Back to Admin</a>
-        </div>
-        <div style="overflow:auto; margin-top:10px">
+        <h3 class="section-title">All Promos</h3>
+        <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
+                <th style="min-width:120px">Code</th>
                 <th>% Off</th>
                 <th>Min</th>
                 <th>Cap</th>
@@ -285,9 +296,9 @@ try{
                 <?php if ($has_per_user): ?><th>Per-User Limit</th><?php endif; ?>
                 <?php if ($has_user_cap): ?><th>Per-User Cap (RM)</th><?php endif; ?>
                 <th>Used</th>
-                <th>Window</th>
+                <th style="min-width:220px">Window</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th style="min-width:220px">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -305,16 +316,34 @@ try{
                     <td><?= isset($r['per_user_amount_cap']) && $r['per_user_amount_cap']!==null ? 'RM'.number_format((float)$r['per_user_amount_cap'],2) : '—' ?></td>
                   <?php endif; ?>
                   <td><?= (int)($r['used_count'] ?? 0) ?></td>
-                  <td class="muted"><?= h($r['starts_at'] ?: '—') ?> → <?= h($r['ends_at'] ?: '—') ?></td>
-                  <td><?= !empty($r['active']) ? 'Active' : 'Off' ?></td>
-                  <td class="actions">
-                    <a class="btn" href="?edit=<?= (int)$r['id'] ?>">Edit</a>
+                  <td class="muted">
+                    <?php
+                      $start = $r['starts_at'] ?: '—';
+                      $end   = $r['ends_at'] ?: '—';
+                      $now   = date('Y-m-d H:i:s');
+                      $inWindow = ($r['starts_at']===''||$r['starts_at']===null||$r['starts_at']<=$now)
+                               && ($r['ends_at']===''||$r['ends_at']===null||$r['ends_at']>=$now);
+                      $badgeClass = $inWindow ? 'green' : 'amber';
+                    ?>
+                    <span class="badge <?= $badgeClass ?>"><?= h($start) ?></span>
+                    →
+                    <span class="badge <?= $badgeClass ?>"><?= h($end) ?></span>
+                  </td>
+                  <td>
                     <?php if(!empty($r['active'])): ?>
-                      <a class="btn" href="?deactivate=<?= (int)$r['id'] ?>" onclick="return confirm('Deactivate this promo?')">Deactivate</a>
+                      <span class="badge green">Active</span>
                     <?php else: ?>
-                      <a class="btn" href="?activate=<?= (int)$r['id'] ?>">Activate</a>
+                      <span class="badge gray">Off</span>
                     <?php endif; ?>
-                    <a class="btn btn-danger" href="?delete=<?= (int)$r['id'] ?>" onclick="return confirm('Delete this promo code permanently?')">Delete</a>
+                  </td>
+                  <td class="actions">
+                    <a class="btn btn-sm" href="?edit=<?= (int)$r['id'] ?>">Edit</a>
+                    <?php if(!empty($r['active'])): ?>
+                      <a class="btn btn-sm" href="?deactivate=<?= (int)$r['id'] ?>" onclick="return confirm('Deactivate this promo?')">Deactivate</a>
+                    <?php else: ?>
+                      <a class="btn btn-sm" href="?activate=<?= (int)$r['id'] ?>">Activate</a>
+                    <?php endif; ?>
+                    <a class="btn btn-danger btn-sm" href="?delete=<?= (int)$r['id'] ?>" onclick="return confirm('Delete this promo code permanently?')">Delete</a>
                   </td>
                 </tr>
               <?php endforeach; else: ?>
@@ -330,14 +359,15 @@ try{
       <!-- Create / Edit -->
       <div class="card">
         <?php if ($editingRow): ?>
-          <h3 style="margin:0 0 8px">Edit Promo</h3>
+          <h3 class="section-title">Edit Promo</h3>
           <form method="post">
             <input type="hidden" name="action" value="update" />
             <input type="hidden" name="id" value="<?= (int)$editingRow['id'] ?>" />
-            <div style="display:grid;gap:10px">
+            <div class="form-grid">
               <div>
                 <label class="muted">Code</label>
                 <input class="input" name="code" value="<?= h($editingRow['code']) ?>" required>
+                <div class="help">Will be stored uppercase.</div>
               </div>
               <div>
                 <label class="muted">Percent Off (0.10 = 10%)</label>
@@ -375,20 +405,21 @@ try{
                 <label class="muted">Ends At (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)</label>
                 <input class="input" name="ends_at" value="<?= h($editingRow['ends_at']) ?>">
               </div>
-              <div class="row" style="justify-content:flex-end">
-                <button class="btn btn-primary" type="submit">Save changes</button>
-                <a class="btn" href="admin_promos.php">Cancel</a>
-              </div>
+            </div>
+            <div class="row" style="justify-content:flex-end;margin-top:10px">
+              <button class="btn btn-primary" type="submit">Save changes</button>
+              <a class="btn" href="admin_promos.php">Cancel</a>
             </div>
           </form>
         <?php else: ?>
-          <h3 style="margin:0 0 8px">Create Promo</h3>
+          <h3 class="section-title">Create Promo</h3>
           <form method="post">
             <input type="hidden" name="action" value="create" />
-            <div style="display:grid;gap:10px">
+            <div class="form-grid">
               <div>
                 <label class="muted">Code</label>
                 <input class="input" name="code" placeholder="WELCOME10" required>
+                <div class="help">Uppercase letters & numbers only recommended.</div>
               </div>
               <div>
                 <label class="muted">Percent Off (0.10 = 10%)</label>
@@ -426,9 +457,9 @@ try{
                 <label class="muted">Ends At</label>
                 <input class="input" name="ends_at" placeholder="2026-01-01 00:00:00">
               </div>
-              <div class="row" style="justify-content:flex-end">
-                <button class="btn btn-primary" type="submit">Create</button>
-              </div>
+            </div>
+            <div class="row" style="justify-content:flex-end;margin-top:10px">
+              <button class="btn btn-primary" type="submit">Create</button>
             </div>
           </form>
         <?php endif; ?>
@@ -436,6 +467,7 @@ try{
     </section>
   </main>
 </div>
-
 </body>
 </html>
+
+

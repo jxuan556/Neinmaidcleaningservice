@@ -18,6 +18,13 @@ require_once __DIR__ . '/config.php';  // load .env
 $stripeSecret = getenv('STRIPE_SECRET_KEY') ?: ''; // secret key from .env
 $stripePublic = getenv('STRIPE_PUBLISHABLE_KEY') ?: ''; // optional, can also be in .env
 
+if (!defined('STRIPE_SECRET')) {
+  define('STRIPE_SECRET', $stripeSecret ?: 'sk_test_REPLACE_ME'); // put your real secret if no .env
+}
+if (!defined('STRIPE_PUBLISHABLE')) {
+  define('STRIPE_PUBLISHABLE', $stripePublic ?: 'pk_test_REPLACE_ME'); // put your real pk if no .env
+}
+
 $SUPPORT_EMAIL    = "hello@neinmaid.com";
 $SUPPORT_WHATSAPP = "60123456789";
 
@@ -365,7 +372,7 @@ $whatsBase="https://wa.me/{$SUPPORT_WHATSAPP}";
   <title>Confirm Booking – NeinMaid</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="confirm.css">
+    <link rel="stylesheet" href="confirm.css">
   <style>
     body { background:#f7f7fb; }
     .navbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#fff;border-bottom:1px solid #e5e7eb}

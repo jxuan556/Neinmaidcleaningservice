@@ -240,7 +240,7 @@ try{
         <a class="nav-link" href="#pricing">Pricing</a> -->
         <a class="nav-link" href="booking_success.php">Booking</a>
         <a class="nav-link" href="careers.php">Careers</a>
-        <a class="nav-link" href="contact_chat.php">Messages</a>
+        <a class="nav-link" href="messages.php">Messages</a>
         <a class="nav-link" href="user_profile.php">Profile</a>
         <div class="nav-search" role="search">
           <button class="search-btn" aria-label="Search">🔍</button>
