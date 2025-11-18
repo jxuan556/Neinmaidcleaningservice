@@ -1,0 +1,322 @@
+/* ===========================
+   WORKER CSS – use on worker_*.php
+   body class="worker"
+   =========================== */
+
+:root {
+  --bg:#020617;
+  --ink:#e5e7eb;
+  --muted:#9ca3af;
+  --line:#1f2937;
+  --card:#020617;
+  --radius:16px;
+  --shadow:0 16px 40px rgba(15,23,42,.9);
+
+  --accent:#22c55e;
+  --accent-soft:rgba(34,197,94,.08);
+  --accent-border:#22c55e;
+
+  --amber:#facc15;
+  --red:#f97373;
+}
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing:border-box;
+}
+
+html, body {
+  margin:0;
+  padding:0;
+}
+
+body.worker {
+  font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:radial-gradient(circle at top,#0f172a 0,#020617 52%,#000 100%);
+  color:var(--ink);
+}
+
+/* Layout */
+.app-shell {
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:250px minmax(0,1fr);
+}
+
+/* Sidebar */
+.sidebar {
+  background:radial-gradient(circle at top,#111827 0,#020617 65%);
+  padding:20px 16px;
+  color:#e5e7eb;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  border-right:1px solid #111827;
+}
+
+.sidebar .logo {
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+
+.sidebar .logo-tag {
+  font-size:11px;
+  color:#9ca3af;
+}
+
+.sidebar-nav {
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.sidebar-nav a {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 11px;
+  border-radius:999px;
+  text-decoration:none;
+  color:#e5e7eb;
+  font-size:13px;
+  border:1px solid transparent;
+}
+
+.sidebar-nav a span.icon {
+  width:20px;
+  text-align:center;
+}
+
+.sidebar-nav a.active,
+.sidebar-nav a:hover {
+  background:rgba(15,23,42,.8);
+  border-color:#1f2937;
+}
+
+/* Main */
+.main {
+  padding:18px 20px 24px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+/* Header */
+.page-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.page-title {
+  font-size:20px;
+  font-weight:700;
+}
+
+.page-subtitle {
+  font-size:13px;
+  color:var(--muted);
+}
+
+/* Cards */
+.card {
+  background:radial-gradient(circle at top left,rgba(15,23,42,.9),rgba(15,23,42,.95));
+  border-radius:var(--radius);
+  border:1px solid #111827;
+  box-shadow:var(--shadow);
+  padding:14px;
+}
+
+.card-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:8px;
+}
+
+.card-title {
+  font-size:14px;
+  font-weight:600;
+}
+
+.card-subtitle {
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* Job list */
+.jobs-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:12px;
+}
+
+.job-pill {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:2px 10px;
+  border-radius:999px;
+  font-size:11px;
+  border:1px solid rgba(148,163,184,.4);
+  background:rgba(15,23,42,.9);
+}
+
+.job-status {
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid transparent;
+}
+
+.job-status.pending {
+  border-color:var(--amber);
+  color:var(--amber);
+}
+
+.job-status.active {
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+.job-status.completed {
+  border-color:#38bdf8;
+  color:#38bdf8;
+}
+
+/* Buttons */
+.btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:7px 12px;
+  border-radius:999px;
+  border:1px solid #1f2937;
+  background:rgba(15,23,42,.8);
+  color:#e5e7eb;
+  font-size:13px;
+  cursor:pointer;
+  text-decoration:none;
+}
+
+.btn-sm {
+  padding:4px 9px;
+  font-size:12px;
+}
+
+.btn-primary {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#022c22;
+}
+
+.btn-primary:hover {
+  filter:brightness(1.05);
+}
+
+.btn-danger {
+  background:#b91c1c;
+  border-color:#b91c1c;
+  color:#fee2e2;
+}
+
+/* Text helpers */
+.text-muted {
+  color:var(--muted);
+  font-size:12px;
+}
+
+.text-right { text-align:right; }
+.text-center { text-align:center; }
+
+/* Tables */
+.table-wrap {
+  width:100%;
+  overflow:auto;
+}
+
+table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+th, td {
+  padding:8px 10px;
+  border-bottom:1px solid #111827;
+}
+
+thead th {
+  background:#020617;
+  position:sticky;
+  top:0;
+  z-index:1;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom:10px;
+}
+
+.form-group label {
+  display:block;
+  font-size:12px;
+  margin-bottom:4px;
+  color:var(--muted);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width:100%;
+  padding:7px 9px;
+  border-radius:10px;
+  border:1px solid #1f2937;
+  background:#020617;
+  color:#e5e7eb;
+  font-size:13px;
+}
+
+/* Tag / chip */
+.chip {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:2px 8px;
+  border-radius:999px;
+  background:rgba(15,23,42,.8);
+  border:1px solid #1f2937;
+  font-size:11px;
+}
+
+/* OTP / code style */
+.code-box {
+  font-family:monospace;
+  letter-spacing:.16em;
+  padding:6px 8px;
+  border-radius:10px;
+  background:#020617;
+  border:1px dashed #1f2937;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns:1fr;
+  }
+  .sidebar {
+    flex-direction:row;
+    padding:10px;
+    overflow-x:auto;
+  }
+}

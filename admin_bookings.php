@@ -375,6 +375,5 @@ $groups = [
     </div>
   </main>
 </div>
-
 </body>
 </html>

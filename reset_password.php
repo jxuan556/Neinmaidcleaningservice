@@ -1,124 +1,150 @@
 <?php
-session_start();
+// reset_password.php – handles sending reset email via Mailtrap
 
-require_once __DIR__ . '/config.php';          // loads .env only
-require_once __DIR__ . '/vendor/autoload.php'; // PHPMailer
+session_start();
+require __DIR__ . '/config.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-/* ---------- Ensure DB connection ---------- */
-if (!isset($conn) || !($conn instanceof mysqli)) {
-  mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-  $DB_HOST = getenv('DB_HOST') ?: 'localhost';
-  $DB_USER = getenv('DB_USER') ?: 'root';
-  $DB_PASS = getenv('DB_PASS') ?: '';
-  $DB_NAME = getenv('DB_NAME') ?: 'maid_system';
-  $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
-  $conn->set_charset('utf8mb4');
+require __DIR__ . '/vendor/autoload.php';
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+$DB_HOST = "localhost";
+$DB_USER = "root";
+$DB_PASS = "";
+$DB_NAME = "maid_system";
+
+try {
+    $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
+    $conn->set_charset('utf8mb4');
+} catch (Throwable $e) {
+    $_SESSION['reset_error'] = "Database connection failed.";
+    header("Location: forgot_password.php");
+    exit();
 }
 
-/* ---------- Helpers ---------- */
-function redirect_with_msg($ok, $msg){
-  $_SESSION['flash'] = ['ok' => $ok, 'msg' => $msg];
-  header("Location: forgot_password.php");
-  exit;
+/* --- helper: ensure column exists --- */
+function col_exists(mysqli $conn, string $table, string $col): bool {
+    $table = preg_replace('/[^A-Za-z0-9_]/','',$table);
+    $dbRow = $conn->query("SELECT DATABASE()")->fetch_row();
+    $db = $conn->real_escape_string($dbRow[0] ?? '');
+    $t  = $conn->real_escape_string($table);
+    $c  = $conn->real_escape_string($col);
+
+    $sql = "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA='{$db}' AND TABLE_NAME='{$t}' AND COLUMN_NAME='{$c}'
+            LIMIT 1";
+    $rs = $conn->query($sql);
+    return ($rs && $rs->num_rows > 0);
 }
 
-/* ---------- Validate input ---------- */
+/* --- Make sure reset columns exist --- */
+try {
+    if (!col_exists($conn,'users','reset_token')) {
+        $conn->query("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255) NULL");
+    }
+    if (!col_exists($conn,'users','reset_expires')) {
+        $conn->query("ALTER TABLE users ADD COLUMN reset_expires DATETIME NULL");
+    }
+} catch (Throwable $e) {
+    // ignore if permissions restricted; we'll still try to continue
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  redirect_with_msg(false, 'Invalid request.');
+    header("Location: forgot_password.php");
+    exit();
 }
 
+/* --- Validate email --- */
 $email = trim($_POST['email'] ?? '');
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-  redirect_with_msg(false, 'Please enter a valid email.');
+    $_SESSION['reset_error'] = "Please enter a valid email address.";
+    header("Location: forgot_password.php");
+    exit();
 }
 
-/* ---------- Step 1: Check user (avoid enumeration) ---------- */
-$st = $conn->prepare("SELECT id, name FROM users WHERE email=? LIMIT 1");
-$st->bind_param("s", $email);
-$st->execute();
-$user = $st->get_result()->fetch_assoc();
-$st->close();
+/* --- Find user --- */
+$stmt = $conn->prepare("SELECT id, name, email FROM users WHERE email = ? LIMIT 1");
+$stmt->bind_param("s", $email);
+$stmt->execute();
+$user = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$user) {
-  redirect_with_msg(true, 'If that email is registered, a reset link has been sent.');
+    // we don't reveal if email exists – just generic message
+    $_SESSION['reset_success'] = "If an account exists for that email, a reset link has been sent.";
+    header("Location: forgot_password.php");
+    exit();
 }
 
-/* ---------- Step 2: Create token (1-hour expiry) ---------- */
-$token  = bin2hex(random_bytes(32)); // Generate random token
-$thash  = hash('sha256', $token); // Hash the token
-$expiry = (new DateTime('+1 hour'))->format('Y-m-d H:i:s'); // Set expiry to 1 hour
+/* --- Generate token & store hash --- */
+$token      = bin2hex(random_bytes(16));
+$tokenHash  = password_hash($token, PASSWORD_DEFAULT);
+$expiresAt  = date('Y-m-d H:i:s', time() + 3600); // 1 hour
 
-/* ---------- Create helper table if missing (idempotent) ---------- */
-$conn->query("
-  CREATE TABLE IF NOT EXISTS password_resets (
-    email        VARCHAR(255) NOT NULL,
-    token_hash   CHAR(64) NOT NULL,
-    expires_at   DATETIME NOT NULL,
-    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (email),
-    KEY token_hash (token_hash),
-    KEY expires_at (expires_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-");
+$upd = $conn->prepare("UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?");
+$upd->bind_param("ssi", $tokenHash, $expiresAt, $user['id']);
+$upd->execute();
+$upd->close();
 
-/* ---------- Step 3: Upsert reset record ---------- */
-$st = $conn->prepare("REPLACE INTO password_resets(email, token_hash, expires_at) VALUES(?, ?, ?)");
-$st->bind_param("sss", $email, $thash, $expiry);
-$st->execute();
-$st->close();
+/* --- Build reset link --- */
+$appUrl   = getenv('APP_URL') ?: (isset($_SERVER['HTTP_HOST'])
+             ? ( (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://')
+                 . $_SERVER['HTTP_HOST'] )
+             : 'http://localhost');
 
-/* ---------- Step 4: Build reset link ---------- */
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$base   = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-$resetUrl = $scheme . '://' . $host . $base . '/reset_form.php?token=' . urlencode($token) . '&email=' . urlencode($email);
+$resetLink = rtrim($appUrl, '/') . '/reset_form.php?token=' . urlencode($token) .
+             '&email=' . urlencode($user['email']);
 
-/* ---------- Step 5: Send email via Mailtrap ---------- */
-$mail = new PHPMailer(true);
+/* --- Mailtrap / SMTP config (from .env) --- */
+$mailHost = getenv('MAILTRAP_HOST') ?: 'sandbox.smtp.mailtrap.io';
+$mailPort = getenv('MAILTRAP_PORT') ?: 2525;
+$mailUser = getenv('MAILTRAP_USER') ?: '';
+$mailPass = getenv('MAILTRAP_PASS') ?: '';
+$mailFrom = getenv('MAIL_FROM')      ?: 'no-reply@example.com';
+$mailFromName = getenv('MAIL_FROM_NAME') ?: 'NeinMaid';
+
+/* --- Send email --- */
 try {
-  $mail->isSMTP();
-  $mail->Host       = getenv('MAIL_HOST') ?: 'smtp.mailtrap.io'; // Mailtrap SMTP server
-  $mail->SMTPAuth   = true;
-  $mail->Port       = (int)(getenv('MAIL_PORT') ?: 2525); // SMTP port for Mailtrap
-  $mail->Username   = getenv('MAIL_USERNAME') ?: ''; // Mailtrap username
-  $mail->Password   = getenv('MAIL_PASSWORD') ?: ''; // Mailtrap password
+    $mail = new PHPMailer(true);
+    $mail->isSMTP();
+    $mail->Host       = $mailHost;
+    $mail->SMTPAuth   = true;
+    $mail->Port       = $mailPort;
+    $mail->Username   = $mailUser;
+    $mail->Password   = $mailPass;
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
 
-  // Sender details
-  $mail->setFrom(
-    getenv('MAIL_FROM_ADDRESS') ?: 'no-reply@neinmaid.local',
-    getenv('MAIL_FROM_NAME') ?: 'NeinMaid'
-  );
-  // Recipient details
-  $mail->addAddress($email, $user['name'] ?? 'Customer');
-  $mail->Subject = 'Reset your NeinMaid password';
-  $mail->isHTML(true);
+    $mail->setFrom($mailFrom, $mailFromName);
+    $mail->addAddress($user['email'], $user['name'] ?: $user['email']);
 
-  // Safely output the name and reset URL
-  $safeName = htmlspecialchars($user['name'] ?? 'there', ENT_QUOTES, 'UTF-8');
-  $safeUrl  = htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8');
+    $mail->isHTML(true);
+    $mail->Subject = 'Reset your NeinMaid password';
 
-  // Email body content
-  $mail->Body = '
-    <div style="font-family:system-ui,Arial,sans-serif;font-size:15px;color:#111">
-      <p>Hi '.$safeName.',</p>
-      <p>We received a request to reset your NeinMaid password.</p>
-      <p>
-        <a href="'.$safeUrl.'" style="display:inline-block;padding:10px 14px;background:#ec4899;color:#fff;border-radius:10px;text-decoration:none">
-          Reset Password
-        </a>
-      </p>
-      <p>Or copy & paste this link:<br>'.$safeUrl.'</p>
-      <p style="color:#6b7280">This link expires in 1 hour. If you didn’t request this, you can ignore this email.</p>
-    </div>';
-  $mail->AltBody = "Reset your password:\n$resetUrl\n(This link expires in 1 hour.)";
+    $body  = '<p>Hi '.htmlspecialchars($user["name"] ?: "there", ENT_QUOTES,'UTF-8').',</p>';
+    $body .= '<p>We received a request to reset the password for your NeinMaid account.</p>';
+    $body .= '<p>Click the button below to set a new password:</p>';
+    $body .= '<p><a href="'.htmlspecialchars($resetLink,ENT_QUOTES,'UTF-8').'" ';
+    $body .= 'style="display:inline-block;padding:10px 16px;border-radius:8px;';
+    $body .= 'background:#ec4899;color:#fff;text-decoration:none;font-weight:600;">';
+    $body .= 'Reset Password</a></p>';
+    $body .= '<p>If the button doesn’t work, copy and paste this link into your browser:<br>';
+    $body .= '<code>'.htmlspecialchars($resetLink,ENT_QUOTES,'UTF-8').'</code></p>';
+    $body .= '<p>This link will expire in 1 hour. If you did not request a reset, you can ignore this email.</p>';
+    $body .= '<p>— NeinMaid</p>';
 
-  // Send the email
-  $mail->send();
-  redirect_with_msg(true, 'If that email is registered, a reset link has been sent.');
+    $mail->Body = $body;
+
+    $mail->send();
+
+    $_SESSION['reset_success'] = "If an account exists for that email, a reset link has been sent.";
+    header("Location: forgot_password.php");
+    exit();
 } catch (Exception $e) {
-  redirect_with_msg(false, 'There was an error sending the reset link. Please try again later.');
+    $_SESSION['reset_error'] = "Failed to send reset email. Please try again later.";
+    header("Location: forgot_password.php");
+    exit();
 }
-?>
+
